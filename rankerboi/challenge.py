@@ -11,6 +11,7 @@ from csv import writer
 def _str(x):
     if type(x) is str:
         return '\'' + x + '\''
+    return str(x)
 
 class Challenge(object):
 
@@ -95,63 +96,68 @@ else:
             passed = False
         if timed_out:
             passed = False
-        return {'passed' : passed, 'time_taken' : time_taken, 'error' : error, 
+        return {'test_case': test_case.name, 'passed' : passed, 'time_taken' : time_taken, 'error' : error, 
         'timed_out' : timed_out, 'output' : out, 'expected_output' : test_case.output}
 
 
-def run(self, code):
-    _run = self._run
-    results = []
-    pbar = ProgressBar(len(self.test_cases))
-    for tc in self.test_cases:
-        results.append(self._run(code, tc))
-        pbar.update()
-    return results
+    def run(self, code):
+        _run = self._run
+        results = []
+        pbar = ProgressBar(len(self.test_cases))
+        for tc in self.test_cases:
+            results.append(self._run(code, tc))
+            pbar.update()
+        return results
 
-def run_csv(self, input_file, output_file='results.csv', individual_results=True, anti_plag=True):
+    def run_csv(self, input_file, output_file='results.csv', individual_results=True, anti_plag=True):
 
-    with open(output_file, 'w') as f:
-        csv = CSVReader(input_file)
-        csv2 = writer(f)
-        data = csv.data
-        header = csv.header
-        header.append('Passed')
-        header.append('Run time')
-        header.append('Error')
-        header.append('Plagiarized')
-        csv2.writerow(header)
-        csv2.writerow()
-        name_col = csv.name_col
-        code_col = csv.code_col
-        if anti_plag:
-            ap = AntiPlag()
-            codes = [x[code_col] for x in data]
-            ap_results = ap(codes)
-            bad_bois = set()
-            for group in ap_results:
-                for boi in group:
-                    bad_bois.add(boi)
-        for i, x in enumerate(data):
-            name = x[name_col]
-            code = x[code_col]
-            print("Running tests for user {} ...".format(name))
-            results = self.run(code)
-            row = data[i][:]
-            is_bad_boi = i in bad_bois
-            if results['passed'] and not is_bad_boi:
+        with open(output_file, 'w') as f:
+            csv = CSVReader(input_file)
+            csv2 = writer(f)
+            data = csv.data
+            header = csv.header
+            header.append('Passed')
+            header.append('Run time')
+            header.append('Error')
+            header.append('Plagiarized')
+            csv2.writerow(header)
+            csv2.writerow()
+            name_col = csv.name_col
+            code_col = csv.code_col
+            if anti_plag:
+                ap = AntiPlag()
+                codes = [x[code_col] for x in data]
+                ap_results = ap(codes)
+                bad_bois = set()
+                for group in ap_results:
+                    for boi in group:
+                        bad_bois.add(boi)
+            for i, x in enumerate(data):
+                name = x[name_col]
+                code = x[code_col]
+                print("Running tests for user {} ...".format(name))
+                results = self.run(code)
+                row = data[i][:]
+                is_bad_boi = i in bad_bois
                 row.append('Yes')
-            else:
-                row.append('No')
-            row.append(results['time_taken'])
-            if results['error'] is None:
-                if results['timed_out']:
-                    row.append('Timed out')
+                if is_bad_boi:
+                    row[-1] = 'No'
                 else:
-                    row.append('')
-            else:
-                row.append(results['error'])
-            if is_bad_boi:
-                row.append('Yes')
-            else:
-                row.append('No')
-            csv2.writerow(row)
+                    for tc in results:
+                        if not tc['passed']:
+                            row[-1] = 'No'
+                            break
+                row.append(sum([r['time_taken'] for r in results]))
+                row.append('')
+                for res in results:
+                    if res['error'] is None:
+                        if res['timed_out']:
+                            row[-1] = 'Timed out'
+                            break
+                    else:
+                        row[-1] = res['error']
+                if is_bad_boi:
+                    row.append('Yes')
+                else:
+                    row.append('No')
+                csv2.writerow(row)
