@@ -1,8 +1,12 @@
 from .test_case import TestCase
 from .executioner import execute
+from .csv_reader import CSVReader
+from .anti_plag import AntiPlag
+from .progressbar import ProgressBar
 from time import time
 import inspect
-import timeit
+from csv import writer
+
 
 def _str(x):
     if type(x) is str:
@@ -74,17 +78,80 @@ else:
         if timeout is None:
             timeout = test_case.timeout
         out_dict, time_taken, timed_out = execute(code, glbls, timeout)
-        return out_dict.get('error', False), time_taken, timed_out
+        error = None
+        if self.output_var_name is not None:
+            if self.output_var_name not in out_dict:
+                if 'error' not in out_dict:
+                    error = 'Out variable not set.'
+                out = None
+            else:
+                out = out_dict[self.output_var_name]
+        else:
+            out = out_dict.get('output')
+        passed = out == test_case.output
+        if error is None:
+            error = out_dict.get('error', None)
+        if error:
+            passed = False
+        if timed_out:
+            passed = False
+        return {'passed' : passed, 'time_taken' : time_taken, 'error' : error, 
+        'timed_out' : timed_out, 'output' : out, 'expected_output' : test_case.output}
 
 
-        
-        
+def run(self, code):
+    _run = self._run
+    results = []
+    pbar = ProgressBar(len(self.test_cases))
+    for tc in self.test_cases:
+        results.append(self._run(code, tc))
+        pbar.update()
+    return results
 
-        
+def run_csv(self, input_file, output_file='results.csv', individual_results=True, anti_plag=True):
 
-
-
-
-
-
-
+    with open(output_file, 'w') as f:
+        csv = CSVReader(input_file)
+        csv2 = writer(f)
+        data = csv.data
+        header = csv.header
+        header.append('Passed')
+        header.append('Run time')
+        header.append('Error')
+        header.append('Plagiarized')
+        csv2.writerow(header)
+        csv2.writerow()
+        name_col = csv.name_col
+        code_col = csv.code_col
+        if anti_plag:
+            ap = AntiPlag()
+            codes = [x[code_col] for x in data]
+            ap_results = ap(codes)
+            bad_bois = set()
+            for group in ap_results:
+                for boi in group:
+                    bad_bois.add(boi)
+        for i, x in enumerate(data):
+            name = x[name_col]
+            code = x[code_col]
+            print("Running tests for user {} ...".format(name))
+            results = self.run(code)
+            row = data[i][:]
+            is_bad_boi = i in bad_bois
+            if results['passed'] and not is_bad_boi:
+                row.append('Yes')
+            else:
+                row.append('No')
+            row.append(results['time_taken'])
+            if results['error'] is None:
+                if results['timed_out']:
+                    row.append('Timed out')
+                else:
+                    row.append('')
+            else:
+                row.append(results['error'])
+            if is_bad_boi:
+                row.append('Yes')
+            else:
+                row.append('No')
+            csv2.writerow(row)
