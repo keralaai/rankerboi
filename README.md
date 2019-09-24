@@ -1,4 +1,4 @@
-# Rankerboi : Testing, Timing an Anti Plagiarization
+# Rankerboi : Testing, Timing and Anti Plagiarization
 
 
 --------
